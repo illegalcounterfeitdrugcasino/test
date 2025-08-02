@@ -1,0 +1,342 @@
+<?php
+// ftp-backend.php
+
+// Increase PHP limits for large file uploads and long execution times
+ini_set('memory_limit', '1024M'); // Increase PHP memory limit to 1GB
+ini_set('post_max_size', '1024M'); // Increase max POST size to 1GB
+ini_set('upload_max_filesize', '1024M'); // Increase max upload file size to 1GB
+ini_set('max_execution_time', 300); // 5 minutes execution time
+ini_set('max_input_time', 300); // 5 minutes input time
+
+// CORS headers to allow cross-origin requests
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+
+// Handle preflight OPTIONS request and exit early
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header("HTTP/1.1 200 OK");
+    exit(0);
+}
+
+header('Content-Type: application/json');
+
+$action = $_GET['action'] ?? '';
+$host = $_POST['host'] ?? '';
+$user = $_POST['user'] ?? '';
+$pass = $_POST['pass'] ?? '';
+$port = $_POST['port'] ?? 21;
+$mode = $_POST['mode'] ?? 'passive'; // New: FTP mode
+$timeout = $_POST['timeout'] ?? 90; // New: Connection timeout
+$ssl = ($_POST['ssl'] ?? 'false') === 'true'; // New: SSL/TLS toggle
+
+$path = $_POST['path'] ?? '';
+$content = $_POST['content'] ?? '';
+$newName = $_POST['newName'] ?? '';
+$newDirName = $_POST['dirName'] ?? '';
+$uploadFileName = $_POST['uploadFileName'] ?? '';
+$searchQuery = $_POST['query'] ?? ''; // New: Search query
+$permissions = $_POST['permissions'] ?? null; // New: Permissions for chmod
+
+function respond($data) {
+    echo json_encode($data);
+    exit;
+}
+
+// Global FTP connection variable
+$conn = null;
+
+// Function to establish FTP connection
+function connect_ftp($host, $user, $pass, $port, $mode, $timeout, $ssl) {
+    global $conn;
+
+    if ($ssl) {
+        $conn = @ftp_ssl_connect($host, $port, $timeout);
+    } else {
+        $conn = @ftp_connect($host, $port, $timeout);
+    }
+
+    if (!$conn) {
+        return ['error' => 'Could not connect to FTP server', 'details' => error_get_last()['message'] ?? ''];
+    }
+    if (!@ftp_login($conn, $user, $pass)) {
+        @ftp_close($conn); // Close connection if login fails
+        return ['error' => 'FTP login failed', 'details' => error_get_last()['message'] ?? ''];
+    }
+
+    if ($mode === 'passive') {
+        ftp_pasv($conn, true); // Enable passive mode
+    } else {
+        ftp_pasv($conn, false); // Enable active mode
+    }
+
+    return ['success' => true];
+}
+
+// Function to recursively list files and directories
+function ftp_list_recursive($conn, $currentPath, $searchQuery = '') {
+    $results = [];
+    // Ensure currentPath ends with a slash for ftp_rawlist
+    $currentPath = rtrim($currentPath, '/') . '/';
+    $rawList = @ftp_rawlist($conn, $currentPath);
+
+    if ($rawList === false) {
+        // If rawlist fails for a directory, it might be empty or permissions issue, skip
+        return [];
+    }
+
+    foreach ($rawList as $item) {
+        preg_match('/^([drwx-]{10})\s+\d+\s+\S+\s+\S+\s+(\d+)\s+([A-Za-z]{3}\s+\d{1,2}\s+(?:\d{2}:\d{2}|\d{4}))\s+(.+)$/', $item, $matches);
+
+        if (count($matches) < 5) { // Expecting at least 4 capturing groups + full match
+            continue; // Skip lines that don't match expected format
+        }
+
+        $permissions = $matches[1];
+        $size = $matches[2];
+        $date_str = $matches[3];
+        $name = $matches[4];
+
+        if ($name === '.' || $name === '..') {
+            continue;
+        }
+
+        // Construct fullPath correctly
+        $fullPath = rtrim($currentPath, '/') . '/' . $name;
+        // Handle root path specifically to avoid "//"
+        if (substr($fullPath, 0, 2) === '//') {
+            $fullPath = '/' . ltrim($fullPath, '/');
+        }
+
+
+        $type = ($permissions[0] === 'd') ? 'directory' : 'file';
+
+        // Check if item matches search query (case-insensitive)
+        $matchesQuery = true;
+        if ($searchQuery !== '') {
+            $matchesQuery = (stripos($name, $searchQuery) !== false || stripos($fullPath, $searchQuery) !== false);
+        }
+
+        $itemData = [
+            'name' => $name,
+            'type' => $type,
+            'fullPath' => $fullPath, // Important for search results
+            'size' => $size,
+            'date' => $date_str,
+            'permissions' => $permissions,
+        ];
+
+        // Add to results if it's a file and matches query, or if it's a directory and matches query
+        // Always recurse into directories to find nested matches.
+        if ($type === 'file' && $matchesQuery) {
+            $results[] = $itemData;
+        } elseif ($type === 'directory') {
+            if ($matchesQuery) { // If directory itself matches, add it to results
+                $results[] = $itemData;
+            }
+            // Recursively list contents of subdirectories
+            $subResults = ftp_list_recursive($conn, $fullPath, $searchQuery);
+            $results = array_merge($results, $subResults);
+        }
+    }
+    return $results;
+}
+
+
+switch ($action) {
+    case 'login':
+        $connectResult = connect_ftp($host, $user, $pass, $port, $mode, $timeout, $ssl);
+        if (isset($connectResult['error'])) {
+            respond($connectResult);
+        }
+        if ($conn) ftp_close($conn);
+        respond(['success' => true]);
+        break;
+
+    case 'quit':
+        // This action does not need to establish an FTP connection itself.
+        // It's a signal to the backend to acknowledge a 'disconnect'.
+        // The actual connection closure happens implicitly when the PHP script ends,
+        // or if we were managing persistent connections (which we are not here).
+        // For now, it just confirms the client's intent to disconnect.
+        respond(['success' => true, 'message' => 'FTP connection assumed closed by client.']);
+        break;
+
+    case 'search':
+        // For search, connect to FTP with the provided parameters
+        $connectResult = connect_ftp($host, $user, $pass, $port, $mode, $timeout, $ssl);
+        if (isset($connectResult['error'])) {
+            respond($connectResult);
+        }
+        // Start recursive listing from root '/'
+        $foundFiles = ftp_list_recursive($conn, '/', $searchQuery);
+        if ($conn) ftp_close($conn);
+        respond(['files' => $foundFiles]);
+        break;
+
+    default:
+        // For all other actions, connect to FTP
+        $connectResult = connect_ftp($host, $user, $pass, $port, $mode, $timeout, $ssl);
+        if (isset($connectResult['error'])) {
+            respond($connectResult);
+        }
+
+        switch ($action) {
+            case 'list':
+                $targetDir = ($path === '') ? '/' : '/' . ltrim($path, '/');
+
+                if (!@ftp_chdir($conn, $targetDir)) {
+                    respond(['error' => 'Failed to access directory: ' . $targetDir . '. It might not exist or is not a directory.', 'details' => error_get_last()['message'] ?? '']);
+                }
+
+                $parsedFiles = [];
+                $rawList = @ftp_rawlist($conn, '.');
+
+                if ($rawList === false) {
+                    respond(['error' => 'Failed to list directory contents for ' . $targetDir, 'details' => error_get_last()['message'] ?? '']);
+                }
+
+                foreach ($rawList as $item) {
+                    preg_match('/^([drwx-]{10})\s+\d+\s+\S+\s+\S+\s+(\d+)\s+([A-Za-z]{3}\s+\d{1,2}\s+(?:\d{2}:\d{2}|\d{4}))\s+(.+)$/', $item, $matches);
+                    if (count($matches) < 5) {
+                        continue;
+                    }
+
+                    $permissions = $matches[1];
+                    $size = $matches[2];
+                    $date_str = $matches[3];
+                    $name = $matches[4];
+
+                    if ($name === '.' || $name === '..') {
+                        continue;
+                    }
+
+                    $type = ($permissions[0] === 'd') ? 'directory' : 'file';
+                    // Construct fullPath correctly for the list action
+                    $itemFullPath = rtrim($targetDir, '/') . '/' . $name;
+                    if ($targetDir === '/') { // Special case for root directory
+                        $itemFullPath = '/' . $name;
+                    }
+                    // Ensure no double slashes in the path
+                    $itemFullPath = str_replace('//', '/', $itemFullPath);
+
+
+                    $parsedFiles[] = [
+                        'name' => $name,
+                        'type' => $type,
+                        'size' => $size,
+                        'date' => $date_str,
+                        'permissions' => $permissions,
+                        'fullPath' => $itemFullPath, // THIS IS THE CRUCIAL ADDITION
+                    ];
+                }
+
+                usort($parsedFiles, function($a, $b) {
+                    if ($a['type'] === 'directory' && $b['type'] !== 'directory') return -1;
+                    if ($a['type'] !== 'directory' && $b['type'] === 'directory') return 1;
+                    return strnatcasecmp($a['name'], $b['name']);
+                });
+
+                respond(['files' => $parsedFiles]);
+                break;
+
+            case 'get':
+                if (empty($path)) respond(['error' => 'No file path provided for download.']);
+                $remoteFilePath = '/' . ltrim($path, '/');
+                $tempFile = fopen('php://temp', 'r+');
+                if (!@ftp_fget($conn, $tempFile, $remoteFilePath, FTP_BINARY)) {
+                    fclose($tempFile);
+                    respond(['error' => 'Failed to download file: ' . $remoteFilePath, 'details' => error_get_last()['message'] ?? '']);
+                }
+                rewind($tempFile);
+                $data = stream_get_contents($tempFile);
+                fclose($tempFile);
+                respond(['content' => base64_encode($data)]);
+                break;
+
+            case 'edit': // This action is effectively replaced by delete then upload in frontend logic
+            case 'upload':
+                if ($uploadFileName === '') respond(['error' => 'uploadFileName is required']);
+                if ($content === '') respond(['error' => 'No content to upload']);
+                if (!empty($path) && !is_string($path)) respond(['error' => 'Invalid path for upload.']);
+
+                $remotePath = ($path === '') ? $uploadFileName : '/' . ltrim($path, '/') . '/' . $uploadFileName;
+                $tmp = tmpfile();
+                if ($tmp === false) respond(['error' => 'Failed to create temporary file for upload']);
+                fwrite($tmp, base64_decode($content));
+                fseek($tmp, 0);
+                if (!@ftp_fput($conn, $remotePath, $tmp, FTP_BINARY)) {
+                    fclose($tmp);
+                    $error_details = error_get_last()['message'] ?? 'Unknown FTP error';
+                    respond(['error' => 'Failed to upload file to ' . $remotePath, 'details' => $error_details]);
+                }
+                fclose($tmp);
+                respond(['success' => true]);
+                break;
+
+            case 'delete':
+                if (empty($path)) respond(['error' => 'No path provided for deletion.']);
+                $remotePath = '/' . ltrim($path, '/');
+                if (!@ftp_delete($conn, $remotePath)) {
+                    if (!@ftp_rmdir($conn, $remotePath)) {
+                        respond(['error' => 'Failed to delete file or directory: ' . $remotePath, 'details' => error_get_last()['message'] ?? '']);
+                    }
+                }
+                respond(['success' => true]);
+                break;
+
+            case 'mkdir':
+                if ($newDirName === '') respond(['error' => 'dirName is required']);
+                $fullDirPath = ($path === '') ? $newDirName : '/' . ltrim($path, '/') . '/' . $newDirName;
+                if (!@ftp_mkdir($conn, $fullDirPath)) {
+                    respond(['error' => 'Failed to create directory: ' . $fullDirPath, 'details' => error_get_last()['message'] ?? '']);
+                }
+                respond(['success' => true]);
+                break;
+
+            case 'rename':
+                if ($newName === '') respond(['error' => 'newName is required']);
+                if (empty($path)) respond(['error' => 'No old path provided for rename.']);
+
+                $oldRemotePath = '/' . ltrim($path, '/');
+                // Construct new remote path based on the directory of the old path
+                $pathParts = explode('/', ltrim($path, '/'));
+                array_pop($pathParts); // Remove the old item name
+                $dir = implode('/', $pathParts);
+                $newRemotePath = ($dir === '') ? $newName : '/' . $dir . '/' . $newName;
+                // Ensure no double slashes in the new path
+                $newRemotePath = str_replace('//', '/', $newRemotePath);
+
+                if (!@ftp_rename($conn, $oldRemotePath, $newRemotePath)) {
+                    respond(['error' => 'Failed to rename file or directory from ' . $oldRemotePath . ' to ' . $newRemotePath, 'details' => error_get_last()['message'] ?? '']);
+                }
+                respond(['success' => true]);
+                break;
+
+            case 'chmod': // New: Handle chmod action
+                if ($permissions === null || !is_numeric($permissions)) {
+                    respond(['error' => 'Invalid permissions provided. Permissions must be a numeric value.']);
+                }
+                if (empty($path)) {
+                    respond(['error' => 'No path provided for changing permissions.']);
+                }
+
+                $remotePath = '/' . ltrim($path, '/');
+                // ftp_chmod expects an octal integer, so convert the string to int with base 8
+                $octalPermissions = intval($permissions, 8);
+
+                if (!@ftp_chmod($conn, $octalPermissions, $remotePath)) {
+                    respond(['error' => 'Failed to change permissions for ' . $remotePath, 'details' => error_get_last()['message'] ?? '']);
+                }
+                respond(['success' => true, 'message' => 'Permissions changed successfully.']);
+                break;
+
+            default:
+                respond(['error' => 'Invalid action']);
+                break;
+        }
+        // Close FTP connection after action is complete
+        if ($conn) ftp_close($conn);
+        break;
+}
+?>
