@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfinityFree FTP Client</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/dialog/dialog.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/search/matchesonscrollbar.min.css">
+    <style>
+        /* CSS Variables for easier theming */
+        :root {
+            --color-bg-primary: #0f172a; /* Deepest dark background */
+            --color-bg-secondary: #1e293b; /* Wrapper/Input area background */
+            --color-bg-tertiary: #2d3748; /* Console background */
+            --color-bg-file-item: #2d3748; /* File item background */
+            --color-bg-file-item-hover: #334155; /* File item hover */
+            --color-bg-file-item-selected: #4a5568; /* File item selected */
+            --color-text-primary: #e2e8f0; /* Main text color */
+            --color-text-secondary: #94a3b8; /* Footer/timestamp text */
+            --color-text-file-name: #e2e8f0; /* File name color */
+            --color-text-file-info: #cbd5e0; /* File size/date color */
+            --color-accent-blue: #3b82f6; /* InfinityFree Blue */
+            --color-accent-blue-light: #60a5fa; /* Lighter Blue */
+            --color-accent-red: #ef4444; /* Clear button red */
+            --color-accent-red-dark: #dc2626; /* Clear button hover */
+            --color-accent-yellow: #facc15; /* Accent Yellow */
+            --color-command: #63b3ed; /* Command text blue */
+            --color-loading: #60a5fa; /* Loading indicator blue */
+            --color-success: #065f46; /* Success message text */
+            --color-success-bg: #ecfdf5; /* Success message background */
+            --color-error: #991b1b; /* Error message text */
+            --color-error-bg: #fef2f2; /* Error message background */
+            --color-info: #92400e; /* Info message text */
+            --color-info-bg: #fefcbf; /* Info message background */
+            --color-border: #334155; /* Border color */
+        }
+
+        /* Global styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
+            color: var(--color-text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        /* Login Screen Styles */
+        #login-screen {
+            display: flex; /* Initially visible */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        .login-container {
+            background-color: var(--color-bg-secondary);
+            padding: 2.5rem 3rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .login-header {
+            margin-bottom: 2rem;
+        }
+        .login-header .logo-text {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--color-accent-blue);
+        }
+        .login-header .sub-logo-text {
+            font-size: 1rem;
+            color: var(--color-text-secondary);
+        }
+
+        .login-form .input-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .login-form label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+
+        .login-form input {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border: 1px solid var(--color-border);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+            background-color: var(--color-bg-primary);
+            color: var(--color-text-primary);
+        }
+
+        .login-form input:focus {
+            border-color: var(--color-accent-blue-light);
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.5);
+        }
+
+        .login-form .btn-login {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .login-footer {
+            margin-top: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--color-text-secondary);
+        }
+
+        #login-error-message {
+            display: none;
+            background-color: var(--color-error-bg);
+            color: var(--color-error);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+        }
+
+        /* Main App Container */
+        #app-container {
+            display: none; /* Initially hidden */
+            background-color: var(--color-bg-secondary);
+            border-radius: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            flex-direction: column;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(90deg, var(--color-accent-blue) 0%, var(--color-accent-blue-light) 100%);
+            padding: 1rem 1.5rem;
+            color: white;
+            font-weight: 700;
+            font-size: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: inset 0 -3px 8px rgba(0, 0, 0, 0.3);
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 1.8rem;
+            letter-spacing: -0.05em;
+            color: white;
+        }
+        .branding-text {
+            font-size: 0.9rem;
+            color: #d1d5db;
+            margin-left: 1rem;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* FTP Section */
+        #ftp-section {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            background-color: var(--color-bg-secondary);
+            overflow: hidden;
+        }
+
+        /* FTP Specific Styles */
+        .path-input-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .path-input {
+            flex-grow: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--color-border);
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+            background-color: var(--color-bg-primary);
+            color: var(--color-text-primary);
+        }
+        .path-input:focus {
+            border-color: var(--color-accent-blue-light);
+            box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.5);
+        }
+        .file-item, .folder-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 0.5rem;
+            background-color: var(--color-bg-file-item);
+            border: 1px solid var(--color-border);
+            transition: background-color 0.3s ease-in-out, border-color 0.3s ease-in-out;
+            cursor: pointer;
+        }
+        .file-item:hover, .folder-item:hover {
+            background-color: var(--color-bg-file-item-hover);
+        }
+        .file-item.selected, .folder-item.selected {
+            background-color: var(--color-bg-file-item-selected);
+            border-color: var(--color-accent-blue);
+        }
+        .file-icon {
+            margin-right: 0.75rem;
+            font-size: 1.2rem;
+            color: #a0aec0;
+            flex-shrink: 0;
+        }
+        .file-name {
+            flex-grow: 1;
+            font-weight: 500;
+            color: var(--color-text-file-name);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            color: var(--color-text-file-info);
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        .file-size { width: 80px; text-align: right; }
+        .file-date { width: 150px; text-align: right; }
+        .file-actions {
+            display: flex;
+            align-items: center;
+            margin-left: auto;
+            padding-left: 1rem;
+            gap: 0.5rem;
+        }
+        .file-action-btn {
+            background-color: #4a5568;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .file-action-btn:hover { background-color: #5a6b82; }
+        .file-action-btn.delete:hover { background-color: var(--color-accent-red); }
+
+
+        .file-list-container {
+            background-color: var(--color-bg-primary);
+            border-radius: 0.75rem;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid var(--color-border);
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-accent-blue) var(--color-bg-primary);
+        }
+        .file-list-container::-webkit-scrollbar { width: 8px; }
+        .file-list-container::-webkit-scrollbar-track { background: var(--color-bg-primary); border-radius: 10px; }
+        .file-list-container::-webkit-scrollbar-thumb { background-color: var(--color-accent-blue); border-radius: 10px; border: 2px solid var(--color-bg-primary); }
+
+        /* General Button Styles */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary {
+            background-color: var(--color-accent-blue);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary:active {
+            background-color: #1d4ed8;
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .btn-secondary {
+            background-color: var(--color-bg-tertiary);
+            color: var(--color-text-primary);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .btn-secondary:hover {
+            background-color: #475569;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .btn-secondary:active {
+            background-color: #334155;
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-danger {
+            background-color: var(--color-accent-red);
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: var(--color-accent-red-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-danger:active {
+            background-color: #b91c1c;
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* Message box styles */
+        .message-box {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            z-index: 2000;
+            font-weight: 500;
+            text-align: center;
+            opacity: 0;
+            transform: translateX(110%);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .message-box.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .message-box.error { background-color: var(--color-error-bg); color: var(--color-error); }
+        .message-box.success { background-color: var(--color-success-bg); color: var(--color-success); }
+        .message-box.info { background-color: var(--color-info-bg); color: var(--color-info); }
+
+        /* Footer */
+        #app-footer {
+            background-color: var(--color-bg-secondary);
+            color: var(--color-text-secondary);
+            padding: 0.75rem 1.5rem;
+            font-size: 0.75rem;
+            text-align: center;
+            border-top: 1px solid var(--color-border);
+            flex-shrink: 0;
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s 0.3s;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            background-color: var(--color-bg-secondary);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            color: var(--color-text-primary);
+            transform: translateY(20px);
+            opacity: 0;
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        }
+        .modal-overlay.show .modal-content {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .modal-close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.8rem;
+            cursor: pointer;
+            color: var(--color-text-secondary);
+            transition: color 0.2s;
+        }
+        .modal-close-button:hover {
+            color: var(--color-text-primary);
+        }
+
+        /* Editor Modal - Full Screen */
+        #editor-modal.modal-overlay.show {
+            background-color: var(--color-bg-secondary);
+        }
+        #editor-modal .modal-content {
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            max-height: none;
+            border-radius: 0;
+            padding: 0;
+        }
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--color-bg-primary);
+            border-bottom: 1px solid var(--color-border);
+        }
+        .editor-wrapper {
+            flex-grow: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+        .CodeMirror {
+            flex-grow: 1;
+            height: 100%;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .cm-s-dracula.CodeMirror { background: #282a36; color: #f8f8f2; }
+        .CodeMirror-dialog {
+            background-color: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            border-top: 1px solid var(--color-border);
+        }
+        .CodeMirror-dialog input {
+             background-color: var(--color-bg-primary);
+             color: var(--color-text-primary);
+             border: 1px solid var(--color-border);
+             border-radius: 0.25rem;
+             padding: 0.25rem 0.5rem;
+        }
+
+        /* Context Menu Styles */
+        #context-menu {
+            position: absolute;
+            background-color: var(--color-bg-secondary);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            min-width: 150px;
+            z-index: 100;
+            overflow: hidden;
+            display: none;
+            border: 1px solid var(--color-border);
+        }
+        #context-menu button {
+            display: block;
+            width: 100%;
+            padding: 0.75rem 1.25rem;
+            text-align: left;
+            background-color: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #context-menu button:hover { background-color: #334155; }
+        #context-menu button:disabled { opacity: 0.6; cursor: not-allowed; background-color: var(--color-bg-secondary); }
+        #context-menu hr { border-top: 1px solid var(--color-border); margin: 0.5rem 0; }
+        
+        /* Share Link Modal Specifics */
+        #share-link-input {
+            background-color: var(--color-bg-primary);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-family: 'Space Mono', monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="logo-text">InfinityFree</div>
+                <div class="sub-logo-text">FTP File Manager</div>
+            </div>
+            <div id="login-error-message"></div>
+            <form id="login-form" class="login-form">
+                <div class="input-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" required>
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" id="login-btn" class="btn btn-primary btn-login">Connect</button>
+            </form>
+            <div class="flex justify-center items-center mt-6">
+                <button id="show-share-modal-btn" class="p-2 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400" title="Get Shareable Link">
+                    <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                </button>
+            </div>
+            <div class="login-footer">
+                Powered by <a href="https://ifastnet.com/" target="_blank" class="text-blue-400 hover:underline">iFastNet</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="flex items-center">
+                <div class="logo">
+                    <span class="logo-text">InfinityFree FTP</span>
+                </div>
+                <div class="branding-text">Powered by iFastNet</div>
+            </div>
+            <div class="flex items-center space-x-4 relative">
+                <!-- Search Bar -->
+                <div id="search-bar-container" class="relative flex items-center">
+                    <input type="text" id="search-input" placeholder="Search files..."
+                           class="px-3 py-1.5 rounded-lg border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 w-64 transition-all duration-200">
+                    <button id="clear-search-btn" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white focus:outline-none hidden">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <button id="disconnect-btn" class="btn btn-danger">Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- FTP Section -->
+            <div id="ftp-section">
+                <div id="ftp-loading-indicator" class="hidden flex justify-center items-center py-4">
+                    <div class="loading-spinner"></div>
+                    <span class="ml-3 text-gray-400">Loading...</span>
+                </div>
+                <div id="ftp-error-message" class="hidden bg-red-800 text-white px-4 py-3 rounded relative mb-4" role="alert">
+                    <strong class="font-bold">FTP Error!</strong>
+                    <span id="ftp-error-text" class="block sm:inline ml-2"></span>
+                </div>
+                
+                <!-- Path Input and Go Up Button -->
+                <div class="path-input-container">
+                    <button id="go-up-btn" class="btn btn-secondary p-2 flex items-center justify-center" title="Go to Parent Directory">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12l7-7 7 7M12 5v14" />
+                        </svg>
+                    </button>
+                    <input type="text" id="path-input" class="path-input" value="/" placeholder="Enter path (e.g., /htdocs/images)">
+                    <button id="go-path-btn" class="btn btn-primary">Go</button>
+                </div>
+
+                <!-- Action Buttons -->
+                <div id="action-buttons-container" class="flex flex-wrap gap-3 mb-4">
+                    <button id="upload-btn" class="btn btn-primary flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Upload File
+                    </button>
+                    <button id="add-file-btn" class="btn btn-secondary flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        New File
+                    </button>
+                    <button id="mkdir-btn" class="btn btn-secondary flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+                        New Folder
+                    </button>
+                </div>
+
+                <!-- File List -->
+                <div id="file-list-container" class="file-list-container">
+                    <div id="files-container">
+                        <div class="text-center text-gray-500 py-8" id="empty-folder-message" style="display: none;">
+                            This folder is empty.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div id="app-footer">
+            &copy; 2025 InfinityFree FTP Client. All rights reserved.
+        </div>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Share Link Modal -->
+    <div id="share-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Shareable Login Link</h3>
+            <p class="text-gray-300 mb-4">Use this link to automatically log in with the specified credentials.</p>
+            <input type="text" id="share-link-input" class="w-full" readonly>
+             <div class="flex justify-end space-x-3 mt-6">
+                <button class="btn btn-secondary modal-cancel-btn">Close</button>
+                <button id="copy-link-btn" class="btn btn-primary">Copy Link</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alert/Confirmation Modal -->
+    <div id="alert-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="alert-modal-title" class="text-xl font-semibold mb-4"></h3>
+            <p id="alert-modal-message" class="text-gray-300 mb-6"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="alert-modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="alert-modal-confirm" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Editor Modal -->
+    <div id="editor-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="editor-header">
+                <h3 class="text-xl font-semibold text-gray-200">Edit File: <span id="editor-file-name" class="text-blue-300"></span></h3>
+                <div class="flex items-center space-x-4">
+                    <button id="search-in-file-btn" class="btn btn-secondary p-2 flex items-center" title="Search in file (Ctrl+F)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </button>
+                    <button id="save-file-btn" class="btn btn-primary">Save Changes</button>
+                    <button class="modal-close-button" style="position: static; font-size: 1.5rem;">&times;</button>
+                </div>
+            </div>
+            <div class="editor-wrapper">
+                <textarea id="file-content-editor"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="image-preview-modal" class="modal-overlay">
+        <div class="modal-content max-w-3xl">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Preview Image: <span id="preview-image-name"></span></h3>
+            <div class="flex justify-center items-center flex-grow overflow-hidden">
+                <img id="image-preview" src="" alt="Image Preview" class="max-w-full max-h-[70vh] object-contain rounded-lg shadow-md">
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button class="btn btn-secondary modal-cancel-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="upload-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Upload File</h3>
+            <input type="file" id="upload-file-input" class="w-full p-3 border border-gray-600 rounded-lg mb-4 bg-gray-700 text-white">
+            <div class="flex justify-end space-x-3">
+                <button class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                <button id="confirm-upload-btn" class="btn btn-primary">Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div id="mkdir-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Create New Folder</h3>
+            <input type="text" id="new-dir-name-input" class="w-full p-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none mb-4 bg-gray-700 text-white" placeholder="Enter new folder name">
+            <div class="flex justify-end space-x-3">
+                <button class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                <button id="confirm-mkdir-btn" class="btn btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add File Modal -->
+    <div id="add-file-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Create New File</h3>
+            <input type="text" id="new-file-name-input" class="w-full p-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none mb-4 bg-gray-700 text-white" placeholder="Enter new file name (e.g., index.html)">
+            <div class="flex justify-end space-x-3">
+                <button class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                <button id="confirm-add-file-btn" class="btn btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div id="rename-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Rename: <span id="rename-old-name"></span></h3>
+            <input type="text" id="new-name-input" class="w-full p-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none mb-4 bg-gray-700 text-white" placeholder="Enter new name">
+            <div class="flex justify-end space-x-3">
+                <button class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                <button id="confirm-rename-btn" class="btn btn-primary">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Permissions Modal -->
+    <div id="chmod-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">Change Permissions for: <span id="chmod-item-name"></span></h3>
+            <p class="text-gray-300 mb-2">Current: <span id="chmod-current-permissions-symbolic" class="font-mono text-blue-300"></span> (<span id="chmod-current-permissions-octal" class="font-mono text-blue-300"></span>)</p>
+
+            <div class="grid grid-cols-3 gap-4 mb-4 text-center">
+                <div>
+                    <p class="font-semibold text-gray-300 mb-2">Owner</p>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-owner-read"><span class="ml-2">Read (4)</span></label>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-owner-write"><span class="ml-2">Write (2)</span></label>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-owner-execute"><span class="ml-2">Execute (1)</span></label>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-300 mb-2">Group</p>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-group-read"><span class="ml-2">Read (4)</span></label>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-group-write"><span class="ml-2">Write (2)</span></label>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-group-execute"><span class="ml-2">Execute (1)</span></label>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-300 mb-2">Others</p>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-others-read"><span class="ml-2">Read (4)</span></label>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-others-write"><span class="ml-2">Write (2)</span></label>
+                    <label class="block"><input type="checkbox" class="form-checkbox" id="chmod-others-execute"><span class="ml-2">Execute (1)</span></label>
+                </div>
+            </div>
+            <p class="text-gray-300 mb-4 text-center">New Permissions: <span id="chmod-calculated-octal" class="font-mono text-blue-300"></span></p>
+
+            <div class="flex justify-end space-x-3">
+                <button class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                <button id="confirm-chmod-btn" class="btn btn-primary">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Info Modal -->
+    <div id="file-info-modal" class="modal-overlay">
+        <div class="modal-content max-w-lg">
+            <button class="modal-close-button">&times;</button>
+            <h3 class="text-xl font-semibold mb-4">File/Folder Information</h3>
+            <div id="file-info-content" class="text-gray-300">
+                <p class="mb-2"><strong class="w-24 inline-block">Name:</strong> <span id="info-name"></span></p>
+                <p class="mb-2"><strong class="w-24 inline-block">Type:</strong> <span id="info-type"></span></p>
+                <p class="mb-2"><strong class="w-24 inline-block">Path:</strong> <span id="info-path"></span></p>
+                <p class="mb-2"><strong class="w-24 inline-block">Size:</strong> <span id="info-size"></span></p>
+                <p class="mb-2"><strong class="w-24 inline-block">Date:</strong> <span id="info-date"></span></p>
+                <p class="mb-2"><strong class="w-24 inline-block">Permissions:</strong> <span id="info-permissions"></span></p>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button class="btn btn-secondary modal-cancel-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/php/php.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/dialog/dialog.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/search/searchcursor.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/search/search.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/scroll/matchesonscrollbar.min.js"></script>
+
+    <script>
+        // --- Configuration ---
+        const FTP_BACKEND_URL = './ftp-backend.php'; // Assumes backend is in the same directory
+        const FTP_HOST = 'ftpupload.net';
+        const FTP_PORT = 21;
+        
+        // --- Global State Variables ---
+        let currentFtpUser = '';
+        let currentFtpPass = '';
+        let currentPath = '';
+        let lastBrowsedPath = '';
+        let isSearching = false;
+        let selectedItem = null;
+        let connectionStatus = 'disconnected';
+        let currentFiles = [];
+        let codeMirrorEditor = null;
+        let alertPromiseResolve = null;
+
+        // --- DOM Elements ---
+        const loginScreen = document.getElementById('login-screen');
+        const appContainer = document.getElementById('app-container');
+        const loginForm = document.getElementById('login-form');
+        const loginUsernameInput = document.getElementById('login-username');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginBtn = document.getElementById('login-btn');
+        const loginErrorMessage = document.getElementById('login-error-message');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const ftpLoadingIndicator = document.getElementById('ftp-loading-indicator');
+        const ftpErrorMessage = document.getElementById('ftp-error-message');
+        const pathInput = document.getElementById('path-input');
+        const goPathBtn = document.getElementById('go-path-btn');
+        const goUpBtn = document.getElementById('go-up-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        const addFileBtn = document.getElementById('add-file-btn');
+        const mkdirBtn = document.getElementById('mkdir-btn');
+        const filesContainer = document.getElementById('files-container');
+        const emptyFolderMessage = document.getElementById('empty-folder-message');
+        const searchInput = document.getElementById('search-input');
+        const clearSearchBtn = document.getElementById('clear-search-btn');
+        const showShareModalBtn = document.getElementById('show-share-modal-btn');
+        const copyLinkBtn = document.getElementById('copy-link-btn');
+        const shareLinkInput = document.getElementById('share-link-input');
+
+        // --- Utility Functions ---
+        function showMessageBox(message, type = 'info', duration = 3000) {
+            const messageBox = document.createElement('div');
+            document.body.appendChild(messageBox);
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`;
+            void messageBox.offsetWidth; // Trigger reflow
+            messageBox.classList.add('show');
+            
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+                messageBox.addEventListener('transitionend', () => messageBox.remove(), { once: true });
+            }, duration);
+        }
+
+        function showFtpMessage(element, text, duration = 5000) {
+            const textElement = element.querySelector('span');
+            element.classList.remove('hidden');
+            if(textElement) textElement.textContent = text;
+            if(duration > 0) {
+                setTimeout(() => element.classList.add('hidden'), duration);
+            }
+        }
+        
+        function hideFtpMessage(element) {
+            element.classList.add('hidden');
+        }
+
+        function showLoadingIndicator(element) {
+            element.classList.remove('hidden');
+            element.classList.add('flex');
+        }
+
+        function hideLoadingIndicator(element) {
+            element.classList.add('hidden');
+            element.classList.remove('flex');
+        }
+
+        function showAlert(title, message, isConfirm = false) {
+            const alertModal = document.getElementById('alert-modal');
+            document.getElementById('alert-modal-title').textContent = title;
+            document.getElementById('alert-modal-message').textContent = message;
+            const cancelBtn = document.getElementById('alert-modal-cancel');
+            const confirmBtn = document.getElementById('alert-modal-confirm');
+            
+            cancelBtn.classList.toggle('hidden', !isConfirm);
+            alertModal.classList.add('show');
+
+            return new Promise((resolve) => {
+                alertPromiseResolve = resolve;
+            });
+        }
+        
+        function resolveAlert(value) {
+            if (alertPromiseResolve) {
+                document.getElementById('alert-modal').classList.remove('show');
+                alertPromiseResolve(value);
+                alertPromiseResolve = null;
+            }
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function getCodeMirrorMode(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            switch (ext) {
+                case 'js': return 'javascript';
+                case 'json': return { name: 'javascript', json: true };
+                case 'css': return 'css';
+                case 'html': case 'htm': return 'htmlmixed';
+                case 'php': return 'php';
+                case 'xml': return 'xml';
+                default: return 'text/plain';
+            }
+        }
+
+        // --- Connection & UI State Management ---
+        async function connectFTP(user, pass) {
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Connecting...';
+            hideFtpMessage(loginErrorMessage);
+
+            currentFtpUser = user;
+            currentFtpPass = pass;
+            
+            const result = await callFtpBackend('login');
+
+            if (result && result.success) {
+                connectionStatus = 'connected';
+                loginScreen.style.display = 'none';
+                appContainer.style.display = 'flex';
+                appContainer.style.animation = 'fadeIn 0.5s ease-out forwards';
+                await listFiles('/');
+            } else {
+                loginErrorMessage.textContent = result ? (result.error + (result.details ? ` (${result.details})` : '')) : 'Connection failed. Please check the backend.';
+                loginErrorMessage.style.display = 'block';
+                connectionStatus = 'disconnected';
+            }
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Connect';
+        }
+
+        async function disconnectFTP() {
+             const confirm = await showAlert('Confirm Disconnect', 'Are you sure you want to disconnect?', true);
+             if(confirm) {
+                await callFtpBackend('quit');
+                connectionStatus = 'disconnected';
+                currentFtpUser = '';
+                currentFtpPass = '';
+                loginUsernameInput.value = '';
+                loginPasswordInput.value = '';
+                appContainer.style.display = 'none';
+                loginScreen.style.display = 'flex';
+                loginScreen.style.animation = 'fadeIn 0.5s ease-out forwards';
+             }
+        }
+        
+        function updateActionButtons() {
+            const isConnected = connectionStatus === 'connected';
+            uploadBtn.disabled = !isConnected;
+            addFileBtn.disabled = !isConnected;
+            mkdirBtn.disabled = !isConnected;
+            pathInput.disabled = !isConnected || isSearching;
+            goPathBtn.disabled = !isConnected || isSearching;
+            goUpBtn.disabled = !isConnected || isSearching || currentPath === '' || currentPath === '/';
+        }
+
+        // --- FTP API Calls ---
+        async function callFtpBackend(action, data = {}) {
+            showLoadingIndicator(ftpLoadingIndicator);
+            hideFtpMessage(ftpErrorMessage);
+
+            const formData = new FormData();
+            formData.append('host', FTP_HOST);
+            formData.append('user', currentFtpUser);
+            formData.append('pass', currentFtpPass);
+            formData.append('port', FTP_PORT);
+            formData.append('ssl', 'true');
+            formData.append('mode', 'passive');
+
+            for (const key in data) {
+                formData.append(key, data[key]);
+            }
+
+            try {
+                const response = await fetch(`${FTP_BACKEND_URL}?action=${action}`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json();
+                if (result.error) throw new Error(result.error + (result.details ? ` - ${result.details}` : ''));
+                
+                hideLoadingIndicator(ftpLoadingIndicator);
+                return result;
+            } catch (e) {
+                hideLoadingIndicator(ftpLoadingIndicator);
+                showFtpMessage(ftpErrorMessage, e.message, 0);
+                return null;
+            }
+        }
+
+        // --- FTP Client Logic ---
+        async function listFiles(path) {
+            if (isSearching) {
+                isSearching = false;
+                searchInput.value = '';
+                clearSearchBtn.classList.add('hidden');
+                path = lastBrowsedPath;
+            } else {
+                lastBrowsedPath = path;
+            }
+            let normalizedPath = path.startsWith('/') ? path : '/' + path;
+            normalizedPath = normalizedPath.replace(/\/+/g, '/');
+            if (normalizedPath === '/') normalizedPath = '';
+
+            const result = await callFtpBackend('list', { path: normalizedPath });
+            if (result && result.files) {
+                currentFiles = [...result.files];
+                renderFileList(currentFiles);
+                currentPath = normalizedPath;
+                pathInput.value = currentPath === '' ? '/' : currentPath;
+                updateActionButtons();
+            }
+        }
+        
+        async function searchFiles(query) {
+            if (!query.trim()) return;
+            isSearching = true;
+            clearSearchBtn.classList.remove('hidden');
+            pathInput.value = `Searching for "${query}"...`;
+
+            const result = await callFtpBackend('search', { query: query });
+            if (result && result.files) {
+                currentFiles = [...result.files];
+                renderFileList(currentFiles);
+                updateActionButtons();
+                showMessageBox(`Found ${result.files.length} results for "${query}".`, 'success');
+            }
+        }
+
+        async function getFileContent(filePath) {
+            const result = await callFtpBackend('get', { path: filePath });
+            if (result && result.content !== undefined) {
+                try {
+                    return decodeURIComponent(escape(atob(result.content))); // Handle UTF-8
+                } catch (e) {
+                    console.error("Failed to decode base64 content", e);
+                    showAlert("File Content Error", "The file content appears to be corrupted or not properly encoded.");
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        async function saveFileContent(filePath, content) {
+            const base64Content = btoa(unescape(encodeURIComponent(content)));
+            const fileName = filePath.split('/').pop();
+            const directoryPath = filePath.substring(0, filePath.lastIndexOf('/')) || '';
+
+            const result = await callFtpBackend('upload', { path: directoryPath, uploadFileName: fileName, content: base64Content });
+            if (result && result.success) {
+                showMessageBox(`File '${fileName}' saved successfully.`, 'success');
+                closeModal('editor-modal');
+                listFiles(currentPath);
+            }
+        }
+
+        async function uploadFile(fileName, fileContentBase64) {
+            const result = await callFtpBackend('upload', { path: currentPath, uploadFileName: fileName, content: fileContentBase64 });
+            if (result && result.success) {
+                showMessageBox(`File '${fileName}' uploaded successfully.`, 'success');
+                closeModal('upload-modal');
+                listFiles(currentPath);
+            }
+        }
+
+        async function deleteItem(item) {
+            const confirm = await showAlert('Confirm Deletion', `Are you sure you want to delete "${item.name}"? This cannot be undone.`, true);
+            if (confirm) {
+                const result = await callFtpBackend('delete', { path: item.fullPath });
+                if (result && result.success) {
+                    showMessageBox(`"${item.name}" deleted successfully.`, 'success');
+                    listFiles(currentPath);
+                }
+            }
+        }
+        
+        async function createNewDirectory(dirName) {
+            const result = await callFtpBackend('mkdir', { path: currentPath, dirName: dirName });
+            if (result && result.success) {
+                showMessageBox(`Folder '${dirName}' created successfully.`, 'success');
+                closeModal('mkdir-modal');
+                listFiles(currentPath);
+            }
+        }
+
+        async function renameItem(item, newName) {
+            const result = await callFtpBackend('rename', { path: item.fullPath, newName: newName });
+            if (result && result.success) {
+                showMessageBox(`Item renamed to "${newName}" successfully.`, 'success');
+                closeModal('rename-modal');
+                listFiles(currentPath);
+            }
+        }
+
+        async function changeFilePermissions(item, newPermissions) {
+            const result = await callFtpBackend('chmod', { path: item.fullPath, permissions: newPermissions });
+            if (result && result.success) {
+                showMessageBox(`Permissions for '${item.name}' changed to '${newPermissions}'.`, 'success');
+                closeModal('chmod-modal');
+                listFiles(currentPath);
+            }
+        }
+        
+        // --- UI Rendering & Modals ---
+        function renderFileList(filesToRender) {
+            filesContainer.innerHTML = '';
+            if (filesToRender.length === 0) {
+                emptyFolderMessage.style.display = 'block';
+                return;
+            }
+            emptyFolderMessage.style.display = 'none';
+
+            filesToRender.forEach(item => {
+                const isDirectory = item.type === 'directory';
+                const div = document.createElement('div');
+                div.className = `flex items-center p-3 rounded-lg mb-2 cursor-pointer ${isDirectory ? 'folder-item' : 'file-item'}`;
+                
+                const icon = `<div class="file-icon w-6 h-6">${getFileIconSvg(item.name, item.type)}</div>`;
+                const name = `<span class="file-name" title="${item.name}">${item.name}</span>`;
+                const size = `<span class="file-size">${isDirectory ? '-' : formatSize(parseInt(item.size))}</span>`;
+                const date = `<span class="file-date">${item.date || ''}</span>`;
+                
+                const editButton = isDirectory ? '' : `<button class="file-action-btn edit-btn">Edit</button>`;
+                
+                const actions = `
+                    <div class="file-actions">
+                        ${editButton}
+                        <button class="file-action-btn info-btn">Info</button>
+                        <button class="file-action-btn rename-btn">Rename</button>
+                        <button class="file-action-btn chmod-btn">Permissions</button>
+                        <button class="file-action-btn delete delete-btn">Delete</button>
+                    </div>`;
+
+                div.innerHTML = `${icon}${name}<div class="file-info">${size}${date}</div>${actions}`;
+                filesContainer.appendChild(div);
+
+                div.addEventListener('click', (e) => {
+                    if (e.target.closest('.file-actions')) return;
+                    filesContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+                    div.classList.add('selected');
+                    selectedItem = item;
+                });
+
+                div.addEventListener('dblclick', () => handleDoubleClick(item));
+                
+                const editBtnEl = div.querySelector('.edit-btn');
+                if (editBtnEl) {
+                    editBtnEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleDoubleClick(item);
+                    });
+                }
+
+                div.querySelector('.info-btn').addEventListener('click', (e) => { e.stopPropagation(); openModal('file-info-modal', item); });
+                div.querySelector('.rename-btn').addEventListener('click', (e) => { e.stopPropagation(); openModal('rename-modal', item); });
+                div.querySelector('.chmod-btn').addEventListener('click', (e) => { e.stopPropagation(); openModal('chmod-modal', item); });
+                div.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); deleteItem(item); });
+            });
+        }
+        
+        async function handleDoubleClick(item) {
+            if (item.type === 'directory') {
+                listFiles(item.fullPath);
+            } else if (isImageFile(item.name)) {
+                openModal('image-preview-modal', item);
+            } else {
+                openModal('editor-modal', item);
+            }
+        }
+        
+        function getFileIconSvg(fileName, fileType) {
+            if (fileType === 'directory') {
+                return `<svg class="w-full h-full text-yellow-500" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"/></svg>`;
+            }
+            return `<svg class="w-full h-full text-gray-500" fill="currentColor" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9l-7-7z"/><path d="M13 2v7h7"/></svg>`;
+        }
+
+        function isImageFile(fileName) {
+            return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(fileName);
+        }
+
+        function getImageMimeType(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            const mimeTypes = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', bmp: 'image/bmp', webp: 'image/webp', svg: 'image/svg+xml' };
+            return mimeTypes[ext] || 'application/octet-stream';
+        }
+        
+        async function openModal(modalId, item) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            // Populate modal content based on type
+            switch(modalId) {
+                case 'editor-modal':
+                    document.getElementById('editor-file-name').textContent = item.name;
+                    modal.dataset.filePath = item.fullPath; // Set this early
+
+                    if (!codeMirrorEditor) {
+                        codeMirrorEditor = CodeMirror.fromTextArea(document.getElementById('file-content-editor'), {
+                            lineNumbers: true,
+                            theme: 'dracula',
+                            indentUnit: 4,
+                            extraKeys: {
+                                "Ctrl-F": "findPersistent",
+                                "Cmd-F": "findPersistent",
+                                "Ctrl-H": "replace",
+                                "Cmd-Alt-F": "replace",
+                                "Ctrl-Shift-H": "replaceAll",
+                                "Cmd-Shift-Alt-F": "replaceAll"
+                            }
+                        });
+                    }
+                    codeMirrorEditor.setOption('mode', getCodeMirrorMode(item.name));
+
+                    if (item.isNew) {
+                        codeMirrorEditor.setValue(''); // New file, empty content
+                    } else {
+                        const content = await getFileContent(item.fullPath);
+                        if (content === null) return; // Don't open modal if fetch fails
+                        codeMirrorEditor.setValue(content);
+                    }
+                    break;
+                case 'image-preview-modal':
+                    document.getElementById('preview-image-name').textContent = item.name;
+                    const result = await callFtpBackend('get', { path: item.fullPath });
+                    if (result && result.content) {
+                        document.getElementById('image-preview').src = `data:${getImageMimeType(item.name)};base64,${result.content}`;
+                    }
+                    break;
+                case 'rename-modal':
+                    document.getElementById('rename-old-name').textContent = item.name;
+                    document.getElementById('new-name-input').value = item.name;
+                    modal.dataset.itemFullPath = item.fullPath;
+                    break;
+                case 'chmod-modal':
+                    document.getElementById('chmod-item-name').textContent = item.name;
+                    const symbolic = item.permissions || '----------';
+                    const octal = symbolicToOctal(symbolic);
+                    document.getElementById('chmod-current-permissions-symbolic').textContent = symbolic;
+                    document.getElementById('chmod-current-permissions-octal').textContent = octal;
+                    ['read','write','execute'].forEach((p, i) => {
+                        document.getElementById(`chmod-owner-${p}`).checked = symbolic[i+1] !== '-';
+                        document.getElementById(`chmod-group-${p}`).checked = symbolic[i+4] !== '-';
+                        document.getElementById(`chmod-others-${p}`).checked = symbolic[i+7] !== '-';
+                    });
+                    updateCalculatedOctal();
+                    modal.dataset.itemFullPath = item.fullPath;
+                    break;
+                case 'file-info-modal':
+                    document.getElementById('info-name').textContent = item.name;
+                    document.getElementById('info-type').textContent = item.type;
+                    document.getElementById('info-path').textContent = item.fullPath;
+                    document.getElementById('info-size').textContent = item.type === 'file' ? formatSize(item.size) : '-';
+                    document.getElementById('info-date').textContent = item.date || 'N/A';
+                    document.getElementById('info-permissions').textContent = item.permissions || 'N/A';
+                    break;
+            }
+
+            modal.classList.add('show');
+            if (modalId === 'editor-modal') {
+                setTimeout(() => codeMirrorEditor.refresh(), 10);
+            }
+        }
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.remove('show');
+        }
+        
+        function openShareModal() {
+            const user = loginUsernameInput.value.trim();
+            const pass = loginPasswordInput.value;
+            if (!user || !pass) {
+                showAlert('Credentials Required', 'Please fill in the username and password fields to generate a shareable link.');
+                return;
+            }
+            const url = `${window.location.origin}${window.location.pathname}?user=${encodeURIComponent(user)}&pass=${encodeURIComponent(pass)}`;
+            shareLinkInput.value = url;
+            openModal('share-modal');
+        }
+
+        function updateCalculatedOctal() {
+            let owner = (document.getElementById('chmod-owner-read').checked * 4) + (document.getElementById('chmod-owner-write').checked * 2) + (document.getElementById('chmod-owner-execute').checked * 1);
+            let group = (document.getElementById('chmod-group-read').checked * 4) + (document.getElementById('chmod-group-write').checked * 2) + (document.getElementById('chmod-group-execute').checked * 1);
+            let others = (document.getElementById('chmod-others-read').checked * 4) + (document.getElementById('chmod-others-write').checked * 2) + (document.getElementById('chmod-others-execute').checked * 1);
+            document.getElementById('chmod-calculated-octal').textContent = `${owner}${group}${others}`;
+        }
+        
+        function symbolicToOctal(p) {
+            if (!p || p.length !== 10) return 'N/A';
+            const map = { 'r': 4, 'w': 2, 'x': 1, '-': 0 };
+            return [p.substring(1, 4), p.substring(4, 7), p.substring(7, 10)]
+                .map(s => s.split('').reduce((acc, char) => acc + map[char], 0))
+                .join('');
+        }
+        
+        // --- Event Listeners ---
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const user = urlParams.get('user');
+            const pass = urlParams.get('pass');
+
+            if (user && pass) {
+                loginUsernameInput.value = user;
+                loginPasswordInput.value = pass;
+                connectFTP(user, pass);
+            }
+        };
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const user = loginUsernameInput.value.trim();
+            const pass = loginPasswordInput.value;
+            if (user && pass) connectFTP(user, pass);
+        });
+
+        disconnectBtn.addEventListener('click', disconnectFTP);
+        
+        showShareModalBtn.addEventListener('click', openShareModal);
+        copyLinkBtn.addEventListener('click', () => {
+            shareLinkInput.select();
+            document.execCommand('copy');
+            showMessageBox('Link copied to clipboard!', 'success');
+        });
+
+        goUpBtn.addEventListener('click', () => {
+            if (isSearching) { listFiles(lastBrowsedPath); return; }
+            if (currentPath === '' || currentPath === '/') return;
+            const newPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '';
+            listFiles(newPath || '/');
+        });
+        goPathBtn.addEventListener('click', () => listFiles(pathInput.value.trim()));
+        pathInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') goPathBtn.click(); });
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim();
+            clearSearchBtn.classList.toggle('hidden', query === '');
+            if (query === '' && isSearching) {
+                isSearching = false;
+                listFiles(lastBrowsedPath || '/');
+            }
+        });
+        searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchFiles(searchInput.value.trim()); });
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearSearchBtn.classList.add('hidden');
+            if (isSearching) listFiles(lastBrowsedPath || '/');
+        });
+
+        uploadBtn.addEventListener('click', () => openModal('upload-modal'));
+        addFileBtn.addEventListener('click', () => openModal('add-file-modal'));
+        mkdirBtn.addEventListener('click', () => openModal('mkdir-modal'));
+        
+        // Modal general close logic
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    if (modal.id === 'alert-modal') {
+                        resolveAlert(false);
+                    } else {
+                        closeModal(modal.id);
+                    }
+                }
+            });
+            modal.querySelectorAll('.modal-close-button, .modal-cancel-btn').forEach(btn => {
+                btn.addEventListener('click', () => closeModal(modal.id));
+            });
+        });
+        
+        // Alert modal specific buttons
+        document.getElementById('alert-modal-confirm').addEventListener('click', () => resolveAlert(true));
+        document.getElementById('alert-modal-cancel').addEventListener('click', () => resolveAlert(false));
+
+        // Editor modal save button
+        document.getElementById('save-file-btn').addEventListener('click', () => {
+            const modal = document.getElementById('editor-modal');
+            const filePath = modal.dataset.filePath;
+            if (filePath) saveFileContent(filePath, codeMirrorEditor.getValue());
+        });
+        
+        // Editor modal search button
+        document.getElementById('search-in-file-btn').addEventListener('click', () => {
+            if (codeMirrorEditor) {
+                codeMirrorEditor.execCommand('findPersistent');
+            }
+        });
+
+        // Other confirm buttons
+        document.getElementById('confirm-upload-btn').addEventListener('click', () => {
+            const file = document.getElementById('upload-file-input').files[0];
+            if (!file) { showAlert('No File Selected', 'Please select a file to upload.'); return; }
+            const reader = new FileReader();
+            reader.onload = (e) => uploadFile(file.name, e.target.result.split(',')[1]);
+            reader.readAsDataURL(file);
+        });
+        document.getElementById('confirm-mkdir-btn').addEventListener('click', () => { const name = document.getElementById('new-dir-name-input').value.trim(); if(name) createNewDirectory(name); });
+        
+        document.getElementById('confirm-add-file-btn').addEventListener('click', () => { 
+            const name = document.getElementById('new-file-name-input').value.trim(); 
+            if(name) { 
+                closeModal('add-file-modal');
+                const newPath = (currentPath === '' || currentPath === '/') ? `/${name}` : `${currentPath}/${name}`;
+                openModal('editor-modal', {
+                    name: name, 
+                    fullPath: newPath.replace('//', '/'), 
+                    isNew: true // Flag to indicate a new file
+                }); 
+            } 
+        });
+
+        document.getElementById('confirm-rename-btn').addEventListener('click', () => {
+            const modal = document.getElementById('rename-modal');
+            const name = document.getElementById('new-name-input').value.trim();
+            const item = currentFiles.find(f => f.fullPath === modal.dataset.itemFullPath);
+            if (item && name) renameItem(item, name);
+        });
+        document.getElementById('confirm-chmod-btn').addEventListener('click', () => {
+            const modal = document.getElementById('chmod-modal');
+            const perms = document.getElementById('chmod-calculated-octal').textContent;
+            const item = currentFiles.find(f => f.fullPath === modal.dataset.itemFullPath);
+            if (item && perms) changeFilePermissions(item, perms);
+        });
+
+        // Chmod checkboxes
+        document.querySelectorAll('#chmod-modal input[type="checkbox"]').forEach(el => {
+            el.addEventListener('change', updateCalculatedOctal);
+        });
+
+    </script>
+</body>
+</html>
